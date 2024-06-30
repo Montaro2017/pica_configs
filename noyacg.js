@@ -282,6 +282,14 @@ class NoyAcgSource extends ComicSource {
                 },
             }
         },
+        // [v3.1.4添加] 可选, 调整缩略图(封面, 预览, 头像等)加载的行为; 如不需要, 删除此字段
+        onThumbnailLoad: (url) => {
+            return {
+                headers: {
+                    'Referer': 'https://noy1.top/',
+                },
+            }
+        },
         // 加载评论
         loadComments: async (id, subId, page, replyTo) => {
             let [comicId] = id.split("#");
