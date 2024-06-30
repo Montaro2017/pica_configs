@@ -49,7 +49,7 @@ class NoyAcgSource extends ComicSource {
             throw `Invalid status code: ${res.status}`
         }
         let resp = JSON.parse(res.body);
-        if (resp.status != 'ok') {
+        if ("status" in resp && resp.status != 'ok') {
             throw resp.status;
         }
         return resp;
