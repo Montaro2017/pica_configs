@@ -48,7 +48,20 @@ class NoyAcgSource extends ComicSource {
         if (res.status != 200) {
             throw `Invalid status code: ${res.status}`
         }
-        return JSON.parse(res.body);
+        let resp = JSON.parse(res.body);
+        if (resp.status != 'ok') {
+            throw resp.status;
+        }
+        return resp;
+    }
+
+    searchComic = async function ({ info, type, sort, page }) {
+        let data = await this.post("https://noy1.top/api/search_v2", `info=${info}&type=${type}&sort=${sort}&page=${page}`);
+        let maxPage = Math.ceil(data.len / 20);
+        return {
+            comics: data.Info.map(this.parseComic),
+            maxPage: maxPage
+        }
     }
 
     getThumbnails = function (comicId, length) {
@@ -70,7 +83,7 @@ class NoyAcgSource extends ComicSource {
             if (status !== 'ok') {
                 throw 'Failed to login';
             }
-
+            return 'ok';
         },
         // 退出登录时将会调用此函数
         logout: () => {
@@ -112,11 +125,12 @@ class NoyAcgSource extends ComicSource {
 
     categoryComics = {
         load: async (category, param, options, page) => {
-            let data = await this.post("https://noy1.top/api/search_v2", `info=${param}&type=tag&sort=${options[0]}&page=${page}`);
-            return {
-                comics: data["Info"].map(this.parseComic),
-                maxPage: Math.ceil(data.len / 20)
-            }
+            return await this.searchComic({
+                info: param,
+                type: 'tag',
+                sort: options[0],
+                page: page
+            })
         },
         optionList: [
             {
@@ -143,44 +157,32 @@ class NoyAcgSource extends ComicSource {
     /// 搜索
     search = {
         load: async (keyword, options, page) => {
-            /*
-            加载漫画
-            options类型为[]string, 来自下方optionList, 顺序保持一致
-            ```
-            let data = JSON.parse((await Network.get('...')).body)
-            let maxPage = data.maxPage
-
-            function parseComic(comic) {
-                // ...
-
-                return {
-                    id: id,
-                    title: title,
-                    subTitle: author,
-                    cover: cover,
-                    tags: tags,
-                    description: description
-                }
-            }
-
-            return {
-                comics: data.list.map(parseComic),
-                maxPage: maxPage
-            }
-            ```
-            */
+            return await this.searchComic({
+                info: keyword,
+                type: options[0],
+                sort: options[1],
+                page: page
+            });
         },
-
         // 提供选项
         optionList: [
             {
+                options: [
+                    "de-综合",
+                    "tag-标签",
+                    "author-作者"
+                ],
+                label: "搜索设置"
+            },
+            {
                 // 使用-分割, 左侧用于数据加载, 右侧显示给用户
                 options: [
-                    "0-time",
-                    "1-popular"
+                    "bid-时间排序",
+                    "views-阅读量排序",
+                    "favorites-收藏排序"
                 ],
                 // 标签
-                label: "sort"
+                label: "排序"
             }
         ]
     }
@@ -233,7 +235,6 @@ class NoyAcgSource extends ComicSource {
         }
     }
 
-
     /// 单个漫画相关
     comic = {
         // 加载漫画信息
@@ -250,7 +251,7 @@ class NoyAcgSource extends ComicSource {
                 // Map<string, string[]> | object 标签
                 tags: {
                     "作者": [data.Author],
-                    "人物": (data.Pname || "").split(" "),
+                    "角色": (data.Pname || "").split(" "),
                     "标签": (data.Ptag || "").split(" "),
                     "其他": (data.Otag || "").split(" "),
                     "页数": [`${data.Len}P`],
