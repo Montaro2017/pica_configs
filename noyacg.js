@@ -6,43 +6,43 @@ class NoyAcgSource extends ComicSource {
     url = ""
 
     init() {
-        Date.prototype.format = function () {
-            let padLeft = function (str, length) {
-                str = str.toString();
-                if (str.length >= length) {
-                    return str;
-                }
-                for (let i = 0; i < length - str.length; i++) {
-                    str = "0" + str;
-                }
+    }
+
+    formatDate = function (date) {
+        let padLeft = function (str, length) {
+            str = str.toString();
+            if (str.length >= length) {
                 return str;
             }
-            return `${padLeft(this.getFullYear(), 4)}-${padLeft(this.getMonth() + 1, 2)}-${padLeft(this.getDate(), 2)}`;
+            for (let i = 0; i < length - str.length; i++) {
+                str = "0" + str;
+            }
+            return str;
         }
+        return `${padLeft(date.getFullYear(), 4)}-${padLeft(date.getMonth() + 1, 2)}-${padLeft(date.getDate(), 2)}`;
     }
 
     parseComic = function (comic) {
-        let formatNum = function (num) {
-            if (num <= 999) {
-                return num.toString();
-            }
-            return (num / 1000).toFixed(2).toString() + "k";
-        }
         return {
             id: `${comic.Bid}#${comic.Len}`,
-            title: comic.Bookname,
+            title: `[${comic.Len}P]${comic.Bookname}`,
             subTitle: comic.Author,
             cover: `https://img.noy.asia/${comic.Bid}/1.webp`,
             tags: (comic.Ptag || "").split(" "),
-            description: `${new Date(comic.Time * 1000).format()}┃${comic.Len}P`
-            // description: `\ud83d\udd52 ${new Date(comic.Time * 1000).format()}  \ud83d\udc41\ufe0f ${formatNum(comic.Views)} \u2665 ${formatNum(comic.Favorites)}`
-            // description: `${comic.Len}Pi🕒2024-06-29 ❤ 189 👍 233`
+            description: `${formatDate(new Date(comic.Time * 1000))}`
         }
     };
 
     post = async function (url, data) {
+        const domain = "https://noy1.top";
         let headers = {
             "Content-Type": "application/x-www-form-urlencoded"
+        }
+        if (!url.startsWith(domain)) {
+            if (!url.startsWith("/")) {
+                url = url + "/";
+            }
+            url = domain + url;
         }
         let res = await Network.post(url, headers, data);
         if (res.status != 200) {
@@ -56,7 +56,7 @@ class NoyAcgSource extends ComicSource {
     }
 
     searchComic = async function ({ info, type, sort, page }) {
-        let data = await this.post("https://noy1.top/api/search_v2", `info=${info}&type=${type}&sort=${sort}&page=${page}`);
+        let data = await this.post("/api/search_v2", `info=${info}&type=${type}&sort=${sort}&page=${page}`);
         let maxPage = Math.ceil(data.len / 20);
         return {
             comics: data.Info.map(this.parseComic),
@@ -78,7 +78,7 @@ class NoyAcgSource extends ComicSource {
         /// 登录
         /// 返回任意值表示登录成功
         login: async (user, pass) => {
-            let data = await this.post('https://noy1.top/api/login', `user=${user}&pass=${pass}`)
+            let data = await this.post('/api/login', `user=${user}&pass=${pass}`)
             const { status } = data;
             if (status !== 'ok') {
                 throw 'Failed to login';
@@ -96,12 +96,12 @@ class NoyAcgSource extends ComicSource {
             title: "NoyAcg",
             type: "singlePageWithMultiPart",
             load: async () => {
-                let data = await this.post("https://noy1.top/api/home")
+                let data = await this.post("/api/home")
                 let comics = {}
                 let size = 6;
                 comics["阅读榜"] = data["readDay"].slice(0, size).map(this.parseComic)
                 comics["收藏榜"] = data["favDay"].slice(0, size).map(this.parseComic)
-                // 高质量榜都是0P
+                // 高质量榜都是0P 暂时注释掉
                 // comics["高质量榜"] = data["proportion"].slice(0, size).map(this.parseComic)
                 comics["收藏推荐"] = data["fs"].slice(0, size).map(this.parseComic)
                 return comics;
@@ -194,9 +194,7 @@ class NoyAcgSource extends ComicSource {
         /// 添加或者删除收藏
         addOrDelFavorite: async (id, folderId, isAdding) => {
             let [comicId] = id.split("#");
-            let res = await Network.post("https://noy1.top/api/adfavorites", {
-                "Content-Type": "application/x-www-form-urlencoded"
-            }, `bid=${comicId}`)
+            let res = await this.post("/api/adfavorites", `bid=${comicId}`)
             let data = res.body;
             if (data === 'ok') {
                 return 'ok';
@@ -227,7 +225,7 @@ class NoyAcgSource extends ComicSource {
         },
         /// 加载漫画
         loadComics: async (page, folder) => {
-            let data = await this.post("https://noy1.top/api/favoriteslist_v2", `page=${page}`);
+            let data = await this.post("/api/favoriteslist_v2", `page=${page}`);
             return {
                 comics: data.info.map(this.parseComic),
                 maxPage: Math.ceil(data.len / 20)
@@ -240,22 +238,20 @@ class NoyAcgSource extends ComicSource {
         // 加载漫画信息
         loadInfo: async (id) => {
             let [comicId, length] = id.split("#");
-            let data = await this.post('https://noy1.top/api/getbookinfo', `bid=${comicId}`);
+            let data = await this.post('/api/getbookinfo', `bid=${comicId}`);
             let comic = {
                 // string 标题
                 title: data.Bookname,
                 // string 封面url
                 cover: `https://img.noy.asia/${comicId}/m1.webp`,
                 // string
-                // description: `${data.Len}P`,
+                description: `${formatDate(new Date(comic.Time * 1000))}`,
                 // Map<string, string[]> | object 标签
                 tags: {
                     "作者": [data.Author],
                     "角色": (data.Pname || "").split(" "),
                     "标签": (data.Ptag || "").split(" "),
-                    "其他": (data.Otag || "").split(" "),
-                    "页数": [`${data.Len}P`],
-                    "日期": [new Date(data.Time * 1000).format()]
+                    "其他": (data.Otag || "").split(" ")
                 },
                 // Map<string, string>? | object, key为章节id, value为章节名称
                 // 注意: 为了保证章节顺序, 最好使用Map, 使用object不能保证顺序
@@ -264,7 +260,6 @@ class NoyAcgSource extends ComicSource {
                 isFavorite: data.F,
                 // thumbnails: this.getThumbnails(comicId, length)
             };
-            console.log(comic);
             return comic;
         },
         // 获取章节图片
@@ -293,7 +288,7 @@ class NoyAcgSource extends ComicSource {
         // 加载评论
         loadComments: async (id, subId, page, replyTo) => {
             let [comicId] = id.split("#");
-            let data = await this.post("https://noy1.top/api/getComment", `bid=${comicId}&page=${page}`);
+            let data = await this.post("/api/getComment", `bid=${comicId}&page=${page}`);
             let over = data.over;
             let getReplyCount = function (cid) {
                 return data.info.filter(c => c.reply == cid).length
@@ -323,7 +318,7 @@ class NoyAcgSource extends ComicSource {
                 replyTo = -1;
             }
             let [comicId] = id.split("#");
-            let data = await this.post("https://noy1.top/api/sendComment", `bid=${comicId}&platform=web&content=${content}&reply=${replyTo}`);
+            let data = await this.post("/api/sendComment", `bid=${comicId}&platform=web&content=${content}&reply=${replyTo}`);
             if (data.status === 'ok') {
                 return "ok";
             }
