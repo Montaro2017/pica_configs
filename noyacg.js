@@ -3,7 +3,7 @@ class NoyAcgSource extends ComicSource {
     key = "noyacg"
     version = "1.0.0"
     minAppVersion = "3.1.0"
-    url = ""
+    url = "https://raw.githubusercontent.com/Montaro2017/pica_configs/master/noyacg.js"
 
     init() {
         Date.prototype.format = function () {
