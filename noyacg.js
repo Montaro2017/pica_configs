@@ -28,9 +28,13 @@ class NoyAcgSource extends ComicSource {
             }
             return (num / 1000).toFixed(2).toString() + "k";
         }
+        let title = `${comic.Bookname}`;
+        if (comic.Len) {
+            title = `[${comic.Len}P]${comic.Bookname}`;
+        }
         return {
             id: `${comic.Bid}#${comic.Len}`,
-            title: `[${comic.Len}P]${comic.Bookname}`,
+            title: title,
             subTitle: comic.Author,
             cover: `https://img.noy.asia/${comic.Bid}/1.webp`,
             tags: (comic.Ptag || "").split(" "),
@@ -96,11 +100,11 @@ class NoyAcgSource extends ComicSource {
             load: async () => {
                 let data = await this.post("https://noy1.top/api/home")
                 let comics = {}
-                let size = 6;
+                let size = 18;
                 comics["阅读榜"] = data["readDay"].slice(0, size).map(this.parseComic)
                 comics["收藏榜"] = data["favDay"].slice(0, size).map(this.parseComic)
                 // 高质量榜都是0P
-                // comics["高质量榜"] = data["proportion"].slice(0, size).map(this.parseComic)
+                comics["高质量榜"] = data["proportion"].slice(0, size).map(this.parseComic)
                 comics["收藏推荐"] = data["fs"].slice(0, size).map(this.parseComic)
                 return comics;
             }
